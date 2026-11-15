@@ -1,0 +1,20 @@
+# 持械入宋 · 第一章沉浸式试验
+
+打开 index.html 即可阅读，也可运行 `node tools/serve.mjs` 后访问 http://127.0.0.1:4173 。
+
+完整保留用户提供的第一章 116 段原文，拆成八幕、21 个节拍。场景标题与探索说明为体验编排；正文不删节。画面为原创矢量雾谷，配乐为浏览器实时合成的五声音阶与风声。旁白使用 Windows 已安装的 Microsoft Huihui Desktop 中文合成语音，音频随站点发布，不依赖访客语音库，不调用外部付费服务。
+
+点击“走入雾谷”开启配乐；“旁白”独立启动朗读；连播默认开启，读完一段自动进入下一段。左右方向键翻段，空格暂停或播放旁白。探索详情会暂停旁白，关闭后点击旁白继续。切到后台自动暂停声音。音量滑块控制配乐，旁白播放时配乐自动降低。浏览器本地保存当前阅读位置。
+
+## GitHub Pages
+
+仓库默认分支 main。将这些文件提交到仓库，在 Settings → Pages → Source 选择 GitHub Actions，附带的 .github/workflows/pages.yml 会发布纯静态网页。使用相对资源路径，支持 github.io/repository/ 子目录，无构建依赖。
+
+只发布第一章和站点资源，不上传完整小说源文件。部署是否完成以 GitHub Actions 成功及公开网址可访问为准。
+
+## 内容与音频维护
+
+`node tools/prepare.mjs` 从 chapter-one.txt 重新生成 story.js 和 tools/narration.json。
+Windows PowerShell 7 运行 `./tools/narrate.ps1` 可重新生成全部 WAV 音频，需要能访问系统已安装的中文语音。
+
+第一章原作版权归相应权利人。本项目未为原文新增开放许可。
