@@ -28,7 +28,7 @@ const music=new Soundscape();
 function updateVoice(){narrating=!voice.paused&&!voice.ended;$('narrate').textContent=narrating?'Ⅱ 暂停旁白':'▷ 旁白';$('narrate').setAttribute('aria-pressed',narrating);music.volume();}
 async function playVoice(){try{await voice.play();}catch{toast('旁白未能播放，请点击“旁白”重试');updateVoice();}}
 voice.addEventListener('play',updateVoice);voice.addEventListener('pause',updateVoice);
-voice.addEventListener('ended',()=>{updateVoice();if(autoplay){if(page<pages.length-1)render(page+1,true);else finish();}});
+voice.addEventListener('ended',()=>{window.dispatchEvent(new Event('story:complete-beat'));updateVoice();if(autoplay){if(page<pages.length-1)render(page+1,true);else finish();}});
 voice.addEventListener('error',()=>{if(started){toast('旁白音频加载失败，请检查文件或网络后重试');updateVoice();}});
 function render(index,play=narrating){
  page=Math.max(0,Math.min(index,pages.length-1));started=true;ended=false;voice.pause();
@@ -48,11 +48,12 @@ function render(index,play=narrating){
  document.querySelectorAll('[data-scene-index]').forEach(b=>{const active=+b.dataset.sceneIndex===p.scene;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
  music.scene=p.scene;music.label();voice.src=p.audio;voice.playbackRate=+$('rate').value;if(play)playVoice();
  try{localStorage.setItem(progressKey,page);}catch{}window.scrollTo({top:0,behavior:'instant'});
+ window.dispatchEvent(new CustomEvent('story:render',{detail:{paragraphs:paragraphs.map((node,i)=>({node,text:p.paragraphs[i],chapter:chapterId}))}}));
 }
 function enter(index=0){render(index,false);music.toggle(true);}
 function finish(){voice.pause();ended=true;$('reader').hidden=true;$('ending').hidden=false;$('progress-label').textContent='第一章 · 完';$('progress').style.width='100%';window.scrollTo({top:0,behavior:'instant'});}
 $('begin').onclick=()=>enter();$('resume').onclick=()=>enter(saved);$('restart').onclick=()=>enter();$('back-end').onclick=()=>render(pages.length-1,false);
-$('prev').onclick=()=>render(page-1);$('next').onclick=()=>page===pages.length-1?finish():render(page+1);
+$('prev').onclick=()=>render(page-1);$('next').onclick=()=>{window.dispatchEvent(new Event('story:complete-beat'));page===pages.length-1?finish():render(page+1);};
 $('music').onclick=()=>music.toggle();$('volume').oninput=e=>{music.level=+e.target.value/100;music.volume();};
 $('narrate').onclick=()=>{if(!started||ended)render(ended?0:page,false);if(voice.paused)playVoice();else voice.pause();};
 $('rate').onchange=e=>voice.playbackRate=+e.target.value;$('auto').onclick=()=>{autoplay=!autoplay;$('auto').textContent='连播 '+(autoplay?'开':'关');$('auto').setAttribute('aria-pressed',autoplay);};

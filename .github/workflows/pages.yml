@@ -23,6 +23,7 @@ jobs:
         run: |
           mkdir -p dist
           cp index.html style.css app.js story.js library.js interactions.js dist/
+          cp chronicle-data.js chronicle-core.js chronicle.js chronicle.css dist/
           if [ -d chapters ]; then cp -r chapters dist/chapters; fi
           cp -r assets dist/assets
           touch dist/.nojekyll
