@@ -14,6 +14,10 @@
 
 ## 内容与音频维护
 
+后续章节按 [制作与发布规范](制作与发布规范.md) 执行，包含目录结构、拆幕、互动锚点、音频、验收与发布回退流程。运行 `node tools/validate.mjs` 检查第一章完整性与资源。
+
+互动入口紧跟相关正文，以金色下划线链接显示；翻段按钮统一黄底。底部声音控制可展开／收起，不改变播放状态。桌面右侧与手机目录均为“章节 → 场景”两级结构；第二至第四章仅预留标题，尚未开放。
+
 `node tools/prepare.mjs` 从 chapter-one.txt 重新生成 story.js 和 tools/narration.json。
 Windows PowerShell 7 运行 `./tools/narrate.ps1` 可重新生成全部 WAV 音频，需要能访问系统已安装的中文语音。
 

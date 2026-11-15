@@ -1,7 +1,10 @@
 'use strict';
 const $=id=>document.getElementById(id),{scenes,pages}=window.STORY;
+const inspect=$('inspect');
+const chapterId=window.STORY.chapter?.id||'ch01';
+const progressKey=`rusong-page-${chapterId}`;
 let page=0,started=false,ended=false,narrating=false,autoplay=true,saved=0,toastTimer;
-try{saved=Math.max(0,Math.min(pages.length-1,Number(localStorage.getItem('rusong-page'))||0));if(localStorage.getItem('rusong-page')!==null)$('resume').hidden=false;}catch{}
+try{const stored=localStorage.getItem(progressKey)??(chapterId==='ch01'?localStorage.getItem('rusong-page'):null);saved=Math.max(0,Math.min(pages.length-1,Number(stored)||0));if(stored!==null)$('resume').hidden=false;}catch{}
 const voice=$('voice');
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4000);}
 // Original, procedural pentatonic score. No third-party music or network requests.
@@ -32,13 +35,19 @@ function render(index,play=narrating){
  const p=pages[page],s=scenes[p.scene];document.body.classList.add('reading');document.body.dataset.scene=s.theme;
  $('intro').hidden=true;$('reader').hidden=false;$('ending').hidden=true;
  $('scene-number').textContent=String(p.scene+1).padStart(2,'0');$('scene-en').textContent=s.en;$('location').textContent=s.location;$('scene-title').textContent=s.title;
- $('passage').replaceChildren(...p.paragraphs.map((text,i)=>{const node=document.createElement('p');node.textContent=text;node.style.animationDelay=`${i*.06}s`;if(text.startsWith('“'))node.className='dialogue';return node;}));
- $('inspect').firstChild.textContent=s.action+' ';$('beat-counter').textContent=`${String(p.part).padStart(2,'0')} / ${String(p.parts).padStart(2,'0')}`;
+ inspect.remove();
+ const paragraphs=p.paragraphs.map((text,i)=>{const node=document.createElement('p');node.textContent=text;node.style.animationDelay=`${i*.06}s`;if(text.startsWith('“'))node.className='dialogue';return node;});
+ $('passage').replaceChildren(...paragraphs);
+ // Each beat explicitly identifies the relevant original paragraph; prose stays unchanged.
+ const anchor=p.interaction?.paragraph??0;
+ inspect.textContent=`${p.interaction?.label||s.action} ↗`;inspect.setAttribute('aria-label',`${p.interaction?.label||s.action}，打开互动详情`);
+ paragraphs[Math.min(anchor,paragraphs.length-1)].append(' ',inspect);
+ $('beat-counter').textContent=`本幕 ${String(p.part).padStart(2,'0')} / ${String(p.parts).padStart(2,'0')}`;
  $('page-counter').textContent=`${String(page+1).padStart(2,'0')} — ${pages.length}`;$('prev').disabled=page===0;$('next').textContent=page===pages.length-1?'走出第一章 ↗':'继续 →';
- $('progress-label').textContent=`第 ${p.scene+1} 幕 / 共 8 幕`;$('progress').style.width=`${(page+1)/pages.length*100}%`;
+ $('progress-label').textContent=`第 ${p.scene+1} 幕 / 共 ${scenes.length} 幕`;$('progress').style.width=`${(page+1)/pages.length*100}%`;
  document.querySelectorAll('[data-scene-index]').forEach(b=>{const active=+b.dataset.sceneIndex===p.scene;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
  music.scene=p.scene;music.label();voice.src=p.audio;voice.playbackRate=+$('rate').value;if(play)playVoice();
- try{localStorage.setItem('rusong-page',page);}catch{}window.scrollTo({top:0,behavior:'instant'});
+ try{localStorage.setItem(progressKey,page);}catch{}window.scrollTo({top:0,behavior:'instant'});
 }
 function enter(index=0){render(index,false);music.toggle(true);}
 function finish(){voice.pause();ended=true;$('reader').hidden=true;$('ending').hidden=false;$('progress-label').textContent='第一章 · 完';$('progress').style.width='100%';window.scrollTo({top:0,behavior:'instant'});}
@@ -48,23 +57,28 @@ $('music').onclick=()=>music.toggle();$('volume').oninput=e=>{music.level=+e.tar
 $('narrate').onclick=()=>{if(!started||ended)render(ended?0:page,false);if(voice.paused)playVoice();else voice.pause();};
 $('rate').onchange=e=>voice.playbackRate=+e.target.value;$('auto').onclick=()=>{autoplay=!autoplay;$('auto').textContent='连播 '+(autoplay?'开':'关');$('auto').setAttribute('aria-pressed',autoplay);};
 document.querySelector('.brand').onclick=e=>{e.preventDefault();voice.pause();started=false;ended=false;$('intro').hidden=false;$('reader').hidden=true;$('ending').hidden=true;document.body.classList.remove('reading');$('progress-label').textContent='序幕';$('progress').style.width='0';saved=page;$('resume').hidden=false;};
-for(const [i,s] of scenes.entries()){
- const b=document.createElement('button');b.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span>${s.title}<small>${s.en}</small>`;b.dataset.sceneIndex=i;b.onclick=()=>{$('scene-dialog').close();if(!started)enter(s.first);else render(s.first);};$('scene-list').append(b);
- const dot=document.createElement('button');dot.textContent=String(i+1).padStart(2,'0');dot.title=s.title;dot.setAttribute('aria-label',`第${i+1}幕 ${s.title}`);dot.dataset.sceneIndex=i;dot.onclick=()=>render(s.first);$('scene-rail').append(dot);
+function buildDirectory(container){
+ for(const [chapterIndex,chapter] of window.LIBRARY.entries()){
+  if(chapter.id===chapterId){
+   const group=document.createElement('details');group.className='chapter-group';group.open=true;
+   const summary=document.createElement('summary');summary.innerHTML=`<small>第 ${String(chapterIndex+1).padStart(2,'0')} 章</small><strong>${chapter.title}</strong>`;group.append(summary);
+   const list=document.createElement('div');list.className='chapter-scenes';
+   scenes.forEach((s,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span><strong>${s.title}</strong>`;b.dataset.sceneIndex=i;b.setAttribute('aria-label',`第${i+1}幕 ${s.title}`);b.onclick=()=>{if($('scene-dialog').open)$('scene-dialog').close();if(!started)enter(s.first);else render(s.first);};list.append(b);});group.append(list);container.append(group);
+  }else{
+   const item=document.createElement(chapter.status==='ready'?'a':'div');item.className='chapter-other';if(chapter.status==='ready')item.href=new URL(chapter.url,window.LIBRARY_ROOT).href;
+   const number=document.createElement('small');number.textContent=`第 ${String(chapterIndex+1).padStart(2,'0')} 章`;
+   const title=document.createElement('strong');title.textContent=chapter.title;const status=document.createElement('small');status.textContent=chapter.status==='ready'?'进入章节 →':'待开放';item.append(number,title,status);container.append(item);
+  }
+ }
 }
+buildDirectory($('scene-rail'));buildDirectory($('scene-list'));
+function setSoundExpanded(expanded){$('audio-controls').hidden=!expanded;$('soundbar').classList.toggle('collapsed',!expanded);document.body.classList.toggle('sound-collapsed',!expanded);$('sound-toggle').textContent=expanded?'收起声音控制 ⌄':'展开声音控制 ⌃';$('sound-toggle').setAttribute('aria-expanded',expanded);try{localStorage.setItem('rusong-sound-expanded',String(expanded));}catch{}}
+$('sound-toggle').onclick=()=>setSoundExpanded($('sound-toggle').getAttribute('aria-expanded')!=='true');
+try{setSoundExpanded(localStorage.getItem('rusong-sound-expanded')!=='false');}catch{setSoundExpanded(true);}
 $('directory').onclick=()=>{$('scene-dialog').showModal();};
 document.querySelectorAll('.close').forEach(b=>b.onclick=()=>b.closest('dialog').close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
-const details=[
- ['翻覆的军车','<p>车头扎进泥里，后桥翘着。四个轮子还在微微轻颤。</p><p>没有公路，没有来路。只有雾、水声，与密密的虫鸣。</p><small>场景观察 · 根据本章原文整理</small>'],
- ['消失的伤疤','<p>王浩川额头上的疤不见了。林昭被弹片划过的旧伤，也消失了。</p><p>他们的记忆没有变化。可身体，像被时间往回拨了一截。</p><small>场景观察 · 根据本章原文整理</small>'],
- ['人员清点','<ul><li>林昭 · 已离开驾驶室</li><li>谢长风 · 警戒四周</li><li>王浩川 · 已脱离军车</li><li>马振邦 · 从树丛中出现</li><li>陈素 · 尚在后座</li></ul><small>仅显示当前剧情已知状态</small>'],
- ['后座的一缕光','<p>袖口掩盖住了手，裤脚堆在脚踝处。</p><p>她的作训服大了一号。那位连续值班三天三夜的军医，仍在沉睡。</p><small>场景观察 · 根据本章原文整理</small>'],
- ['随身的小圆镜','<button class="mirror-disc" id="mirror" aria-label="翻开镜子，看向镜中的自己"></button><p class="reveal" id="reflection">轻触镜面</p><small>“我看看我是不是在做梦……”</small>'],
- ['随身物资','<ul><li>五把军用匕首</li><li>五把手枪 · 各配备用弹夹</li><li>手枪弹药 · 一百五十发</li><li>一把微冲 · 六十发</li><li>一把狙击枪 · 十发</li><li>四颗手雷</li><li>两把工兵铲 · 一个望远镜</li><li>陈素的急救包</li></ul><small>物资记录 · 按原文列示</small>'],
- ['全频段静默','<div class="signal-bars" id="bars"><i style="--h:15px"></i><i style="--h:30px"></i><i style="--h:45px"></i><i style="--h:60px"></i><i style="--h:75px"></i></div><p id="signal-result">GPS / 北斗卫星手机 / 移动通讯</p><button id="scan">重新搜索</button><small>剧情内的设备模拟，不会访问你的定位或网络。</small>'],
- ['留在雾里的旧世界','<p>军车已经被树枝遮盖，碎玻璃被拢进车底。</p><p>车钥匙带走了。林昭拔下行车记录仪，揣进口袋。</p><p>前方没有路标。他们只能离开。</p><small>场景观察 · 根据本章原文整理</small>']
-];
-$('inspect').onclick=()=>{voice.pause();const i=pages[page].scene;const [title,html]=details[i];$('detail-title').textContent=title;$('detail-body').innerHTML=html;$('detail-tag').textContent=`FIELD NOTES / 0${i+1}`;$('detail-dialog').showModal();if(i===4)$('mirror').onclick=()=>{$('reflection').textContent='熟悉的记忆。十五六岁的面容。';};if(i===6)$('scan').onclick=()=>{const b=$('scan'),bars=$('bars'),r=$('signal-result');b.disabled=true;b.textContent='搜索中…';bars.classList.add('scanning');r.textContent='正在尝试建立连接…';setTimeout(()=>{bars.classList.remove('scanning');r.textContent='无信号。连忙音都没有。';b.textContent='再次尝试';b.disabled=false;},2200);};};
+const details=window.INTERACTIONS;
+inspect.onclick=e=>{e.preventDefault();voice.pause();const i=pages[page].scene;const [title,html,type]=details[i];$('detail-title').textContent=title;$('detail-body').innerHTML=html;$('detail-tag').textContent=`FIELD NOTES / 0${i+1}`;$('detail-dialog').showModal();if(type==='mirror')$('mirror').onclick=()=>{$('reflection').textContent='熟悉的记忆。十五六岁的面容。';};if(type==='signal')$('scan').onclick=()=>{const b=$('scan'),bars=$('bars'),r=$('signal-result');b.disabled=true;b.textContent='搜索中…';bars.classList.add('scanning');r.textContent='正在尝试建立连接…';setTimeout(()=>{bars.classList.remove('scanning');r.textContent='无信号。连忙音都没有。';b.textContent='再次尝试';b.disabled=false;},2200);};};
 document.addEventListener('keydown',e=>{if(!started||ended||document.querySelector('dialog[open]')||/INPUT|SELECT|BUTTON|A/.test(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();$('next').click();}if(e.key==='ArrowLeft'){e.preventDefault();if(page>0)render(page-1);}if(e.code==='Space'){e.preventDefault();$('narrate').click();}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){voice.pause();if(music.ctx)music.ctx.suspend();}else if(music.ctx&&music.on)music.ctx.resume().catch(()=>{});});
 // Sparse ambient particles; disabled for reduced-motion preference.

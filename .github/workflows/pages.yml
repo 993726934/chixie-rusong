@@ -22,7 +22,8 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p dist
-          cp index.html style.css app.js story.js dist/
+          cp index.html style.css app.js story.js library.js interactions.js dist/
+          if [ -d chapters ]; then cp -r chapters dist/chapters; fi
           cp -r assets dist/assets
           touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
