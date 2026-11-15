@@ -2,7 +2,7 @@
 (function(root){
  'use strict';
  function create(data,snapshot){
-  const items=new Map([...data.places,...data.achievements].map(item=>[item.id,item]));
+  const items=new Map([...data.places,...data.achievements,...(data.characters??[]),...(data.relationships??[])].map(item=>[item.id,item]));
   const validEvents=new Set(data.triggers.map(event=>event.id));
   const records=new Map();
   if(snapshot?.version===1&&Array.isArray(snapshot.records))for(const record of snapshot.records){
@@ -13,6 +13,7 @@
   return {
    has:id=>records.has(id),
    record:id=>records.get(id),
+   visibleRelationships:()=> (data.relationships??[]).filter(edge=>[edge.id,edge.from,edge.to].every(id=>records.has(id))),
    encounter(chapter,text){
     const added=[];
     for(const trigger of data.triggers){

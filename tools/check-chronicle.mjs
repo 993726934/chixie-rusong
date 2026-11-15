@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 const context={window:{}};vm.createContext(context);
 for(const file of ['chronicle-data.js','chronicle-core.js','story.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
 const {CHRONICLE_DATA:data,ChronicleCore:core,STORY:story}=context.window;
-const ids=[...data.places,...data.achievements].map(i=>i.id);assert.equal(new Set(ids).size,ids.length);
+const ids=[...data.places,...data.achievements,...data.characters,...data.relationships].map(i=>i.id);assert.equal(new Set(ids).size,ids.length);
+const castIds=new Set(data.characters.map(item=>item.id));
+for(const edge of data.relationships){assert.ok(castIds.has(edge.from)&&castIds.has(edge.to)&&edge.from!==edge.to);}
 assert.equal(new Set(data.triggers.map(t=>t.id)).size,data.triggers.length);
 for(const t of data.triggers){assert.ok(t.chapter&&t.anchor&&t.source);t.unlocks.forEach(id=>assert.ok(ids.includes(id)));if(t.chapter===story.chapter.id)assert.equal(story.pages.flatMap(p=>p.paragraphs).filter(p=>p===t.anchor).length,1);}
 for(const route of data.routes)route.forEach(id=>assert.ok(data.places.some(p=>p.id===id)));
@@ -21,3 +23,20 @@ assert.equal(core.create(data,{version:1,records:[null,5,'bad']}).snapshot().rec
 const future={...data,triggers:[...data.triggers,{id:'lin-appointed',chapter:'volume02-ch05',anchor:'林昭正式受任。',unlocks:['career-lin-jinglue'],source:'测试章'},{id:'wang-appointed',chapter:'volume02-ch06',anchor:'王浩川正式受任。',unlocks:['career-wang-tongpan'],source:'测试章'},{id:'technology-ready',chapter:'volume02-ch07',anchor:'首次试飞完成。',unlocks:['tech-balloon'],source:'测试章'}]};
 const next=core.create(future,null);next.encounter('volume02-ch06','王浩川正式受任。');assert.ok(next.has('career-wang-tongpan'));assert.ok(!next.has('career-lin-jinglue'));assert.ok(!next.has('place-valley'));next.encounter('volume02-ch07','首次试飞完成。');assert.ok(next.has('tech-balloon'));assert.equal(next.snapshot().records.length,2);
 console.log('PASS: fog at start, exact chapter/paragraph triggers, no mention-based awards, repeat safety, persistence, malformed saves, character isolation and future technology unlocks.');
+
+const cast=core.create(data,null);
+const event=id=>data.triggers.find(item=>item.id===id).anchor;
+cast.encounter('ch01','“先找人。马振邦和陈素还没出来。”');
+assert.ok(!cast.has('person-ma')&&!cast.has('person-chen'),'mentioned characters remain hidden');
+cast.encounter('ch01',event('ch01-chen-lin'));
+assert.equal(cast.visibleRelationships().length,0,'a relationship stays hidden until both characters appear');
+cast.encounter('ch01',event('ch01-chen-appears'));
+assert.equal(cast.visibleRelationships().length,0);
+cast.encounter('ch01',event('ch01-lin-appears'));
+assert.equal(cast.visibleRelationships()[0].id,'relation-chen-lin');
+const complete=core.create(data,null);
+for(const page of story.pages)for(const paragraph of page.paragraphs)complete.encounter('ch01',paragraph);
+assert.equal(data.characters.filter(item=>complete.has(item.id)).length,5);
+assert.equal(core.create(data,complete.snapshot()).visibleRelationships().length,4);
+assert.ok(core.create(data,engine.snapshot()).has('place-valley'),'previous saves remain readable');
+console.log('PASS: five first appearances, four relationships, no early identities, and graph restoration.');

@@ -13,4 +13,4 @@ console.log(`Base commit ${head}; ${changed.length} changed files. Existing audi
 if(!changed.length){console.log('No changes to publish.');process.exit(0);}
 const tree=[];
 for(let i=0;i<changed.length;i+=3){await Promise.all(changed.slice(i,i+3).map(async file=>{const blob=await api('git/blobs','POST',{content:fs.readFileSync(file).toString('base64'),encoding:'base64'});tree.push({path:file,mode:'100644',type:'blob',sha:blob.sha});console.log('Uploaded '+file);}));}
-const t=await api('git/trees','POST',{base_tree:base,tree});const commit=await api('git/commits','POST',{message:'Add fog-of-war story map and historical achievements with persistent progression',tree:t.sha,parents:[head]});await api('git/refs/heads/main','PATCH',{sha:commit.sha,force:false});console.log('Published commit '+commit.sha);
+const t=await api('git/trees','POST',{base_tree:base,tree});const commit=await api('git/commits','POST',{message:'Add character relationship graph and five-person achievement filters',tree:t.sha,parents:[head]});await api('git/refs/heads/main','PATCH',{sha:commit.sha,force:false});console.log('Published commit '+commit.sha);
